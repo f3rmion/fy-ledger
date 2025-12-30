@@ -44,8 +44,8 @@ bool frost_inject_keys(uint8_t curve_id,
     nvm_write((void *)&N_frost.initialized, &init_marker, sizeof(init_marker));
     nvm_write((void *)&N_frost.curve_id, &curve_id, sizeof(curve_id));
     nvm_write((void *)&N_frost.identifier, &identifier, sizeof(identifier));
-    nvm_write((void *)&N_frost.group_public_key, (void *)group_pubkey, BJJ_POINT_SIZE);
-    nvm_write((void *)&N_frost.secret_share, (void *)secret_share, BJJ_SCALAR_SIZE);
+    nvm_write((void *)&N_frost.group_public_key, (void *)group_pubkey, CURVE_POINT_SIZE);
+    nvm_write((void *)&N_frost.secret_share, (void *)secret_share, CURVE_SCALAR_SIZE);
 
     return true;
 }

@@ -1,6 +1,6 @@
 # fy-ledger
 
-FROST threshold signatures for Baby Jubjub curve on Ledger hardware wallets.
+FROST threshold signatures for Baby Jubjub curve on Ledger hardware wallets. Compatible with [gnark-crypto](https://github.com/consensys/gnark-crypto) and the [fy](https://github.com/f3rmion/fy) FROST library.
 
 ## Overview
 
@@ -12,114 +12,140 @@ This Ledger app enables secure storage of FROST key shares and performs threshol
 - Hardware RNG for nonce generation (critical for FROST security)
 - User confirmation for key injection and signing
 - Automatic nonce clearing after signing
+- Compatible with gnark-crypto's Baby Jubjub twisted Edwards curve
+- Blake2b-512 hashing with fy-compatible domain separation
+
+## Curve Support
+
+Currently supports Baby Jubjub (BJJ) curve using gnark-crypto's twisted Edwards form:
+- Base field: BN254 Fr (prime ~254 bits)
+- Curve equation: `a*x² + y² = 1 + d*x²*y²` where `a = -1 mod p`
+- Point compression: Little-endian Y with sign bit in MSB of last byte
+
+## FROST Protocol
+
+This implementation follows the FROST protocol with fy-compatible hashing:
+
+| Hash Function | Domain Tag | Purpose |
+|---------------|------------|---------|
+| H1 (rho) | `FROST-EDBABYJUJUB-BLAKE512-v1` + `rho` | Binding factor |
+| H2 (chal) | `FROST-EDBABYJUJUB-BLAKE512-v1` + `chal` | Challenge |
+
+All hashes use Blake2b-512, interpreted as little-endian and reduced mod curve order.
 
 ## APDU Commands
 
 | INS | Command | Description |
 |-----|---------|-------------|
 | 0x00 | GET_VERSION | Get app version |
-| 0x01 | GET_PUBLIC_KEY | Get group public key |
+| 0x01 | GET_PUBLIC_KEY | Get group public key (32 bytes compressed) |
 | 0x19 | INJECT_KEYS | Store FROST key share |
 | 0x1A | COMMIT | Generate nonces, return commitments |
 | 0x1B | INJECT_MESSAGE | Set message hash to sign |
-| 0x1C | INJECT_COMMITMENTS_P1 | Send commitment list (part 1) |
-| 0x1D | INJECT_COMMITMENTS_P2 | Send commitment list (part 2) |
+| 0x1C | INJECT_COMMITMENTS | Send commitment list |
 | 0x1E | PARTIAL_SIGN | Compute partial signature |
 | 0x1F | RESET | Clear signing state |
+
+### Data Formats
+
+**INJECT_KEYS (0x19):**
+- P1: Curve ID (0x00 = BJJ)
+- Data: `group_pubkey[32] || participant_id[32] || secret_share[32]`
+
+**COMMIT (0x1A):**
+- Returns: `hiding_commitment[32] || binding_commitment[32]`
+
+**INJECT_COMMITMENTS (0x1C):**
+- P1: Number of participants
+- Data: For each participant: `id[32] || hiding[32] || binding[32]`
+
+**PARTIAL_SIGN (0x1E):**
+- Returns: `partial_signature[32]`
 
 ## Building
 
 ### Prerequisites
 
-- Docker (recommended)
-- Or: Ledger SDK and ARM toolchain
+- Docker
 
-### Using Docker (recommended)
+### Build Script
 
 ```bash
-# Pull the dev tools image
-docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest
+# Build for Baby Jubjub (default)
+./build.sh BJJ
 
-# Build for Nano S+
-docker run --rm -v $(pwd):/app \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
-  bash -c "cd /app && make"
-
-# Build for specific target
-docker run --rm -v $(pwd):/app \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
-  bash -c "cd /app && make TARGET=nanox"
+# Output: bin/app.elf
 ```
 
-### Targets
+### Manual Build
 
-- `nanos2` - Nano S+ (default)
-- `nanox` - Nano X
-- `stax` - Stax
-- `flex` - Flex
+```bash
+docker run --rm -v $(pwd):/app \
+  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest \
+  bash -c "cd /app && make CURVE=BJJ"
+```
 
 ## Testing with Speculos
 
-Speculos is Ledger's official emulator - test without physical hardware.
+Speculos is Ledger's official emulator.
 
 ### Quick Start
 
 ```bash
 # 1. Build the app
-docker run --rm -v $(pwd):/app \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
-  bash -c "cd /app && make"
+./build.sh BJJ
 
 # 2. Run in Speculos emulator
-docker run --rm -it -v $(pwd):/app -p 5000:5000 -p 9999:9999 \
-  ghcr.io/ledgerhq/speculos \
-  --model nanosp /app/bin/app.elf
+docker run --rm -d \
+  -v $(pwd)/bin:/app \
+  -p 5001:5001 -p 9999:9999 \
+  ghcr.io/ledgerhq/speculos:latest \
+  /app/app.elf --model nanosp \
+  --seed "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" \
+  --display headless --apdu-port 9999 --api-port 5001
 
-# 3. Open http://localhost:5000 in browser to see virtual Ledger screen
-# 4. Send APDUs to localhost:9999
+# 3. Run the 2-of-3 FROST test
+cd scripts && python3 test-2of3.py
 ```
 
-### Speculos Ports
+### Expected Output
 
-| Port | Purpose |
-|------|---------|
-| 5000 | Web UI - virtual device screen with buttons |
-| 9999 | APDU TCP - send commands programmatically |
-
-### Send Test APDUs
-
-```bash
-# Get version (INS=0x00)
-echo "E000000000" | nc localhost 9999 | xxd
-
-# Using Python
-python3 -c "
-import socket
-s = socket.socket()
-s.connect(('localhost', 9999))
-s.send(bytes.fromhex('E000000000'))
-print(s.recv(100).hex())
-"
+```
+======================================================================
+FROST 2-of-3 Signing: Ledger + Software Participant
+======================================================================
+...
+[11] Verifying aggregated signature...
+    SIGNATURE VALID!
+======================================================================
+2-of-3 FROST signing completed successfully!
+======================================================================
 ```
 
-### Debug Output
+## Integration with fy Library
 
-Build with `DEBUG=1` to see printf statements:
+Generate FROST key shares using the fy library's DKG, then inject into Ledger:
 
-```bash
-docker run --rm -v $(pwd):/app \
-  ghcr.io/ledgerhq/ledger-app-builder/ledger-app-dev-tools:latest \
-  bash -c "cd /app && make DEBUG=1"
+```go
+package main
+
+import (
+    "github.com/f3rmion/fy/bjj"
+    "github.com/f3rmion/fy/frost"
+)
+
+func main() {
+    g := &bjj.BJJ{}
+
+    // Run DKG for 2-of-3
+    shares, groupPubKey := frost.KeyGen(g, 2, 3)
+
+    // Share 1 goes to Ledger via INJECT_KEYS APDU
+    // Shares 2,3 can be software participants or other Ledgers
+}
 ```
 
-## Loading to Device
-
-```bash
-# Linux (requires udev rules)
-make load
-
-# Or use Ledger Live developer mode
-```
+See `scripts/keygen/` for the full Go helper and `scripts/test-2of3.py` for the Python test harness.
 
 ## Security Model
 
@@ -150,7 +176,8 @@ Any error or `RESET` command returns to IDLE and clears nonces.
 ## Project Structure
 
 ```
-ledger-app-frost/
+fy-ledger/
+├── build.sh              # Build script
 ├── Makefile              # Build configuration
 ├── ledger_app.toml       # App manifest
 ├── src/
@@ -158,11 +185,17 @@ ledger-app-frost/
 │   ├── globals.h         # Global declarations
 │   ├── handler.h/c       # APDU command handlers
 │   ├── frost_storage.h/c # NVRAM storage
-│   ├── bjj.h/c           # Baby Jubjub crypto
-│   ├── ui.h/c            # User interface
-│   └── glyphs.h          # Icon declarations
-├── glyphs/               # App icons (GIF format)
-└── tests/                # Functional tests
+│   ├── frost.h/c         # FROST protocol operations
+│   ├── curve.h           # Curve abstraction
+│   └── ui.h/c            # User interface
+├── curves/
+│   └── bjj/
+│       ├── curve_bjj.h   # BJJ curve interface
+│       └── curve_bjj.c   # BJJ implementation (gnark-crypto compatible)
+├── scripts/
+│   ├── test-2of3.py      # FROST 2-of-3 integration test
+│   └── keygen/           # Go helper for key generation
+└── glyphs/               # App icons
 ```
 
 ## License

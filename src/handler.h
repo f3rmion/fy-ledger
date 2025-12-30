@@ -20,8 +20,7 @@
 #define INS_FROST_PARTIAL_SIGN          0x1E
 #define INS_FROST_RESET                 0x1F
 
-// Curve identifiers
-#define CURVE_BABY_JUBJUB               0x00
+// Curve identifier is defined in curve.h as CURVE_ID
 
 // Status words
 #define SW_OK                           0x9000
@@ -47,13 +46,13 @@ uint16_t handle_get_version(uint8_t *response, uint8_t *response_len);
 // Get group public key (if keys are loaded)
 // P1: 0x00
 // P2: 0x00
-// Response: group_public_key (64)
+// Response: group_public_key (32, compressed)
 uint16_t handle_get_public_key(uint8_t *response, uint8_t *response_len);
 
 // Inject FROST keys
-// P1: curve_id (0x00 = Baby Jubjub)
+// P1: curve_id (must match CURVE_ID)
 // P2: 0x00
-// Data: group_pubkey (64) || identifier (32) || secret_key (32)
+// Data: group_pubkey (32) || identifier (32) || secret_key (32) = 96 bytes
 // Response: none
 uint16_t handle_inject_keys(uint8_t p1, uint8_t p2,
                             uint8_t *data, uint8_t data_len,
@@ -62,7 +61,7 @@ uint16_t handle_inject_keys(uint8_t p1, uint8_t p2,
 // Generate FROST commitment
 // P1: 0x00
 // P2: 0x00
-// Response: hiding_commit (64) || binding_commit (64)
+// Response: hiding_commit (32) || binding_commit (32) = 64 bytes
 uint16_t handle_commit(uint8_t *response, uint8_t *response_len);
 
 // Inject message hash to sign
