@@ -1,0 +1,13 @@
+[app]
+build_directory = "./"
+sdk = "C"
+devices = ["nanos+", "nanox", "stax", "flex"]
+
+[use_cases]
+developer = "ehjc"
+name = "FROSTGUARD"
+version = "1.0.0"
+icon = "icon"
+
+[tests]
+pytest_directory = "./tests/"
