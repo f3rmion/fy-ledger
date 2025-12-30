@@ -1,4 +1,4 @@
-# FROSTGUARD Ledger App
+# fy-ledger
 
 FROST threshold signatures for Baby Jubjub curve on Ledger hardware wallets.
 
