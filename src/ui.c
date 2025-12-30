@@ -43,7 +43,7 @@ UX_STEP_NOCB(
     pnn,
     {
         &C_icon_dashboard,
-        "FROSTGUARD",
+        "FY",
         "Ready",
     });
 

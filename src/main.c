@@ -1,5 +1,5 @@
 /**
- * FROSTGUARD Ledger Application
+ * FY Ledger Application
  *
  * FROST threshold signatures for Baby Jubjub curve.
  * Securely stores key shares and performs partial signing operations.

@@ -5,7 +5,7 @@ devices = ["nanos+", "nanox", "stax", "flex"]
 
 [use_cases]
 developer = "ehjc"
-name = "FROSTGUARD"
+name = "FY"
 version = "1.0.0"
 icon = "icon"
 
