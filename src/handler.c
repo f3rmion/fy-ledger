@@ -246,8 +246,9 @@ uint16_t handle_partial_sign(uint8_t *response, uint8_t *response_len) {
         return SW_CONDITIONS_NOT_SAT;
     }
 
-    // Must have all required data
-    if (G_frost_ctx.state != FROST_STATE_COMMITMENTS_SET) {
+    // Accept either COMMITMENTS_SET (legacy Blake2b) or CHALLENGE_SET (Railgun Poseidon)
+    if (G_frost_ctx.state != FROST_STATE_COMMITMENTS_SET &&
+        G_frost_ctx.state != FROST_STATE_CHALLENGE_SET) {
         return SW_CONDITIONS_NOT_SAT;
     }
 
@@ -315,12 +316,18 @@ uint16_t handle_partial_sign(uint8_t *response, uint8_t *response_len) {
         return SW_INTERNAL_ERROR;
     }
 
-    // Compute challenge
+    // Get challenge (external Poseidon or computed Blake2b)
     uint8_t challenge[CURVE_SCALAR_SIZE];
-    frost_compute_challenge(challenge,
-                            group_commitment,
-                            frost_get_group_pubkey(),
-                            G_frost_ctx.message_hash);
+    if (G_frost_ctx.use_external_challenge) {
+        // Use pre-computed Poseidon challenge (Railgun mode)
+        memcpy(challenge, G_frost_ctx.external_challenge, CURVE_SCALAR_SIZE);
+    } else {
+        // Compute challenge using Blake2b (legacy mode)
+        frost_compute_challenge(challenge,
+                                group_commitment,
+                                frost_get_group_pubkey(),
+                                G_frost_ctx.message_hash);
+    }
 
     // Compute partial signature
     uint8_t partial_sig[CURVE_SCALAR_SIZE];
@@ -353,6 +360,33 @@ uint16_t handle_partial_sign(uint8_t *response, uint8_t *response_len) {
     explicit_bzero(my_binding_factor, sizeof(my_binding_factor));
     explicit_bzero(binding_factors, sizeof(binding_factors));
     explicit_bzero(challenge, sizeof(challenge));
+
+    return SW_OK;
+}
+
+// ============================================================================
+// Challenge Injection Handler (Railgun/Poseidon mode)
+// ============================================================================
+
+uint16_t handle_inject_challenge(uint8_t *data, uint8_t data_len) {
+    if (!frost_has_keys()) {
+        return SW_CONDITIONS_NOT_SAT;
+    }
+
+    // Must have commitments set first
+    if (G_frost_ctx.state != FROST_STATE_COMMITMENTS_SET) {
+        return SW_CONDITIONS_NOT_SAT;
+    }
+
+    // Challenge must be 32 bytes
+    if (data_len != CURVE_SCALAR_SIZE) {
+        return SW_WRONG_LENGTH;
+    }
+
+    // Store external challenge
+    memcpy(G_frost_ctx.external_challenge, data, CURVE_SCALAR_SIZE);
+    G_frost_ctx.use_external_challenge = true;
+    G_frost_ctx.state = FROST_STATE_CHALLENGE_SET;
 
     return SW_OK;
 }

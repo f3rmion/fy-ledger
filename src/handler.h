@@ -19,6 +19,7 @@
 #define INS_FROST_INJECT_COMMITMENTS_P2 0x1D
 #define INS_FROST_PARTIAL_SIGN          0x1E
 #define INS_FROST_RESET                 0x1F
+#define INS_FROST_INJECT_CHALLENGE      0x20  // Pre-computed Poseidon challenge for Railgun
 
 // Curve identifier is defined in curve.h as CURVE_ID
 
@@ -99,3 +100,10 @@ uint16_t handle_partial_sign(uint8_t *response, uint8_t *response_len);
 // P2: 0x00
 // Response: none
 uint16_t handle_reset(void);
+
+// Inject pre-computed challenge (for Railgun/Poseidon compatibility)
+// P1: 0x00
+// P2: 0x00
+// Data: challenge (32 bytes)
+// Response: none
+uint16_t handle_inject_challenge(uint8_t *data, uint8_t data_len);

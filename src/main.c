@@ -101,6 +101,10 @@ void app_main(void) {
                         sw = handle_reset();
                         break;
 
+                    case INS_FROST_INJECT_CHALLENGE:
+                        sw = handle_inject_challenge(data, lc);
+                        break;
+
                     default:
                         THROW(SW_INS_NOT_SUPPORTED);
                 }

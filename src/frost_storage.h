@@ -47,6 +47,7 @@ typedef enum {
     FROST_STATE_COMMITTED,       // Nonces generated, commitments ready
     FROST_STATE_MESSAGE_SET,     // Message hash injected
     FROST_STATE_COMMITMENTS_SET, // All participant commitments received
+    FROST_STATE_CHALLENGE_SET,   // External challenge injected (Railgun mode)
     FROST_STATE_READY_TO_SIGN    // Ready for partial signature
 } frost_state_t;
 
@@ -69,6 +70,10 @@ typedef struct {
     uint8_t  num_participants;
     uint16_t commitment_bytes_received;
     uint8_t  commitment_list[MAX_PARTICIPANTS * COMMITMENT_ENTRY_SIZE];
+
+    // External challenge support (Railgun/Poseidon mode)
+    uint8_t external_challenge[CURVE_SCALAR_SIZE];
+    bool    use_external_challenge;
 } frost_ctx_t;
 
 // RAM context declaration (G_ prefix for RAM globals)
